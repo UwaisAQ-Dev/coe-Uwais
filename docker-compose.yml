@@ -1,0 +1,61 @@
+services:
+  # 0. Servis Database PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: coe_db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: coe_db
+      POSTGRES_USER: coe_user
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coe_user -d coe_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 1. Servis Backend Laravel
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    container_name: coe_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/backend:/var/www/backend
+      - /var/www/backend/vendor
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=coe_db
+      - DB_USERNAME=coe_user
+      - DB_PASSWORD=secret
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 2. Servis Frontend Nuxt
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: coe_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src/frontend:/app
+      - /app/node_modules
+    environment:
+      - NUXT_PUBLIC_API_BASE=http://localhost:8000/api
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

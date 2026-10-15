@@ -1,0 +1,26 @@
+# Environment & Secrets (Sangat penting jangan push ke GitHub)
+.env
+.env.backup
+*.env
+
+# Backend / Laravel
+src/backend/vendor/
+src/backend/storage/*.key
+src/backend/storage/logs/
+src/backend/storage/framework/cache/
+src/backend/storage/framework/sessions/
+src/backend/storage/framework/views/
+src/backend/bootstrap/cache/
+
+# Frontend / Nuxt
+src/frontend/node_modules/
+src/frontend/.nuxt/
+src/frontend/.output/
+src/frontend/dist/
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
