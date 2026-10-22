@@ -16,14 +16,15 @@ class ProductController extends Controller
         // 1. Mulakan pembina pertanyaan (Query Builder)
         $query = Product::with('category');
 
-        // 2. Carian (Search): Jika pengguna hantar parameter ?search=...
+                // 2. Carian (Search): Jika pengguna hantar parameter ?search=...
         if ($request->has('search') && !empty($request->search)) {
             $keyword = $request->search;
             $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('description', 'like', "%{$keyword}%");
+                $q->where('name', 'ilike', "%{$keyword}%")
+                  ->orWhere('description', 'ilike', "%{$keyword}%");
             });
         }
+        
         // 3. Susunan (Sorting): Jika ada pilihan susun harga / nama / tarikh
         $sortBy = $request->get('sort_by', 'created_at'); // default: tarikh dicipta
         $order  = $request->get('order', 'desc');         // default: terkini dahulu

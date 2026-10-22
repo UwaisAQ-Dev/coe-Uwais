@@ -5,8 +5,16 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   runtimeConfig: {
     public: {
-      apiBase:'http://localhost:8000/api'
+      apiBase: 'http://localhost:8000/api'
+    },
+  },
+  // Tambahan: Paksa Vite imbas perubahan fail dari Windows setiap 1 saat
+  vite: {
+    server: {
+      watch: {
+        usePolling: true,
+        interval: 1000,
+      },
     },
   },
 })
-

@@ -41,7 +41,7 @@ services:
       db:
         condition: service_healthy
 
-  # 2. Servis Frontend Nuxt
+   # 2. Servis Frontend Nuxt
   frontend:
     build:
       context: ./src/frontend
@@ -54,6 +54,8 @@ services:
       - /app/node_modules
     environment:
       - NUXT_PUBLIC_API_BASE=http://localhost:8000/api
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
     depends_on:
       - backend
 

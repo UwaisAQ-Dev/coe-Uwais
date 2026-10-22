@@ -17,11 +17,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-         // 1. Cipta Test User (jika belum ada)
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            // 1A. Cipta Akaun ADMIN Utama
+        User::create([
+            'name' => 'Admin COE',
+            'email' => 'admin@coe.com',
+            'password' => 'password123', // Automatik di-hash oleh User.php!
+            'role' => 'admin',
         ]);
+        // 1B. Cipta Akaun CUSTOMER Ujian
+        User::create([
+            'name' => 'Customer Tester',
+            'email' => 'customer@coe.com',
+            'password' => 'password123',
+            'role' => 'customer',
+        ]);
+
+
         // 2. Cipta Categories dan simpan ke dalam variable
         $catLaptop = Category::create([
             'name' => 'Laptop & Komputer',
