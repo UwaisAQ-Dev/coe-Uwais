@@ -37,11 +37,18 @@ services:
       - DB_DATABASE=coe_db
       - DB_USERNAME=coe_user
       - DB_PASSWORD=secret
+      # Konfigurasi Sambungan Redis untuk Cache & State
+      - CACHE_STORE=redis
+      - REDIS_CLIENT=predis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
-   # 2. Servis Frontend Nuxt
+  # 2. Servis Frontend Nuxt
   frontend:
     build:
       context: ./src/frontend
@@ -59,5 +66,20 @@ services:
     depends_on:
       - backend
 
+  # 3. Servis In-Memory Cache & State (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: coe_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata:
+  redisdata:

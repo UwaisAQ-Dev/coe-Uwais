@@ -5,99 +5,124 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * 1. Papar Senarai Produk Berserta Caching Redis (TTL: 60 Saat)
      */
     public function index(Request $request)
     {
-        // 1. Mulakan pembina pertanyaan (Query Builder)
-        $query = Product::with('category');
+        // 1. Cipta kunci cache unik berdasarkan parameter URL (carian, susun, muka surat)
+        $cacheKey = 'products_index_' . md5(json_encode($request->query()));
 
-                // 2. Carian (Search): Jika pengguna hantar parameter ?search=...
-        if ($request->has('search') && !empty($request->search)) {
-            $keyword = $request->search;
-            $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'ilike', "%{$keyword}%")
-                  ->orWhere('description', 'ilike', "%{$keyword}%");
-            });
-        }
-        
-        // 3. Susunan (Sorting): Jika ada pilihan susun harga / nama / tarikh
-        $sortBy = $request->get('sort_by', 'created_at'); // default: tarikh dicipta
-        $order  = $request->get('order', 'desc');         // default: terkini dahulu
-        $query->orderBy($sortBy, $order);
+        // Semak adakah data ini sudah ada dalam RAM Redis sebelum diambil
+        $isCached = Cache::has($cacheKey);
 
-        // 4. Penomboran Halaman (Pagination): Papar mengikut saiz halaman (cth: 5 produk)
-        $perPage  = $request->get('per_page', 5);
-        $products = $query->paginate($perPage);
+        // 2. Gunakan Cache::remember: Jika ada dalam Redis, ambil terus; jika tiada, tanya PostgreSQL dan simpan ke Redis selama 60 saat
+        $cachedData = Cache::remember($cacheKey, 60, function () use ($request) {
+            $query = Product::with('category');
 
-        // 5. Pulangkan respon JSON berserta metadata halaman
+            // Carian (Search) mengabaikan huruf besar/kecil (ilike)
+            if ($request->has('search') && !empty($request->search)) {
+                $keyword = $request->search;
+                $query->where(function ($q) use ($keyword) {
+                    $q->where('name', 'ilike', "%{$keyword}%")
+                      ->orWhere('description', 'ilike', "%{$keyword}%");
+                });
+            }
+
+            // Susunan (Sorting)
+            $sortBy = $request->get('sort_by', 'created_at');
+            $order  = $request->get('order', 'desc');
+            $query->orderBy($sortBy, $order)->orderBy('id', $order);
+
+            // Penomboran Halaman (Pagination)
+            $perPage  = $request->get('per_page', 5);
+            $products = $query->paginate($perPage);
+
+            return [
+                'items' => $products->toArray()['data'],
+                'meta'  => [
+                    'current_page' => $products->currentPage(),
+                    'last_page'    => $products->lastPage(),
+                    'per_page'     => $products->perPage(),
+                    'total'        => $products->total(),
+                ]
+            ];
+        });
+
+        // 3. Pulangkan respon JSON berserta label sumber data
         return response()->json([
             'success' => true,
             'message' => 'Senarai produk berjaya diambil',
-            'data'    => $products->items(), // Senarai rekod untuk halaman ini
-            'meta'    => [
-                'current_page' => $products->currentPage(),
-                'last_page'    => $products->lastPage(),
-                'per_page'     => $products->perPage(),
-                'total'        => $products->total(),
-            ]
+            'source'  => $isCached ? 'REDIS_CACHE (Pantas/RAM)' : 'POSTGRESQL_DB (Pertanyaan Asal)',
+            'data'    => $cachedData['items'],
+            'meta'    => $cachedData['meta']
         ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * 2. Tambah Produk Baharu & Padam Cache (Cache Invalidation)
      */
     public function store(Request $request)
     {
-            // 1. Validasi Input (Semak syarat keselamatan data dari borang)
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric',
+            'name'        => 'required|string|max:255',
+            'price'       => 'required|numeric',
             'description' => 'required|string',
-            'stock' => 'required|integer',
-            'image_url' => 'nullable|url',
+            'stock'       => 'required|integer',
+            'image_url'   => 'nullable|url',
             'category_id' => 'nullable|exists:categories,id',
         ]);
-       
-            // 2. Simpan produk baharu ke dalam pangkalan data
+
         $product = Product::create($validated);
 
-            // 3. Pulangkan respon JSON dengan status HTTP 201 Created!
+        // Invalidation: Padam semua cache produk dalam Redis supaya data baharu kelihatan serta-merta!
+        Cache::flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Produk berjaya ditambah',
-            'data' => $product
+            'data'    => $product
         ], 201);
     }
 
     /**
-     * Display the specified resource.
+     * 3. Papar Butiran 1 Produk
      */
     public function show(string $id)
     {
-        //
-    }
+        $product = Product::with('category')->find($id);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        // 1. Cari rekod mengikut ID (Sama macam fnSELECT... dalam C)
-        $product = Product::find($id);
-        
-        // 2. Jika rekod tiada, pulangkan ralat 404
         if (!$product) {
             return response()->json([
                 'success' => false,
                 'message' => 'Produk tidak dijumpai'
             ], 404);
         }
-        // 3. Semak syarat validasi data baharu
+
+        return response()->json([
+            'success' => true,
+            'data'    => $product
+        ]);
+    }
+
+    /**
+     * 4. Kemas Kini Produk & Padam Cache (Cache Invalidation)
+     */
+    public function update(Request $request, string $id)
+    {
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk tidak dijumpai'
+            ], 404);
+        }
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'price'       => 'required|numeric',
@@ -105,11 +130,13 @@ class ProductController extends Controller
             'stock'       => 'required|integer',
             'image_url'   => 'nullable|url',
             'category_id' => 'nullable|exists:categories,id',
-            
         ]);
-        // 4. Kemaskini rekod dalam database (EXEC SQL UPDATE...)
+
         $product->update($validated);
-        // 5. Pulangkan respon JSON status berjaya
+
+        // Invalidation: Padam cache lama dalam Redis
+        Cache::flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Produk berjaya dikemaskini',
@@ -118,15 +145,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * 5. Padam Produk & Padam Cache (Cache Invalidation)
      */
     public function destroy(string $id)
     {
-        
-        // 1. Cari produk (Eloquent ORM automatik buat SELECT mengikut Primary Key)
         $product = Product::find($id);
 
-        // 2. Semak jika rekod tiada (jika null, hantar HTTP Status Code 404)
         if (!$product) {
             return response()->json([
                 'success' => false,
@@ -134,10 +158,11 @@ class ProductController extends Controller
             ], 404);
         }
 
-        // 3. Padam dari database (Eloquent automatik buat DELETE SQL)
         $product->delete();
-        
-        // 4. Hantar respon JSON status berjaya (HTTP 200 OK secara default)
+
+        // Invalidation: Padam cache lama dalam Redis
+        Cache::flush();
+
         return response()->json([
             'success' => true,
             'message' => 'Produk berjaya dipadam'
