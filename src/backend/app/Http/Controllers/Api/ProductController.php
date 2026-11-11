@@ -27,8 +27,8 @@ class ProductController extends Controller
         // 3. Susunan (Sorting): Jika ada pilihan susun harga / nama / tarikh
         $sortBy = $request->get('sort_by', 'created_at'); // default: tarikh dicipta
         $order  = $request->get('order', 'desc');         // default: terkini dahulu
-        $query->orderBy($sortBy, $order);
-
+        $query->orderBy($sortBy, $order)->orderBy('id', $order);
+        
         // 4. Penomboran Halaman (Pagination): Papar mengikut saiz halaman (cth: 5 produk)
         $perPage  = $request->get('per_page', 5);
         $products = $query->paginate($perPage);
@@ -36,7 +36,7 @@ class ProductController extends Controller
         // 5. Pulangkan respon JSON berserta metadata halaman
         return response()->json([
             'success' => true,
-            'message' => 'Senarai produk berjaya diambil',
+            'message' => 'Products retrieved successfully',
             'data'    => $products->items(), // Senarai rekod untuk halaman ini
             'meta'    => [
                 'current_page' => $products->currentPage(),
@@ -68,7 +68,7 @@ class ProductController extends Controller
             // 3. Pulangkan respon JSON dengan status HTTP 201 Created!
         return response()->json([
             'success' => true,
-            'message' => 'Produk berjaya ditambah',
+            'message' => 'Product created successfully',
             'data' => $product
         ], 201);
     }
@@ -93,7 +93,7 @@ class ProductController extends Controller
         if (!$product) {
             return response()->json([
                 'success' => false,
-                'message' => 'Produk tidak dijumpai'
+                'message' => 'Product not found'
             ], 404);
         }
         // 3. Semak syarat validasi data baharu
@@ -111,7 +111,7 @@ class ProductController extends Controller
         // 5. Pulangkan respon JSON status berjaya
         return response()->json([
             'success' => true,
-            'message' => 'Produk berjaya dikemaskini',
+            'message' => 'Product updated successfully',
             'data'    => $product
         ]);
     }
@@ -129,7 +129,7 @@ class ProductController extends Controller
         if (!$product) {
             return response()->json([
                 'success' => false,
-                'message' => 'Produk tidak dijumpai'
+                'message' => 'Product not found'
             ], 404);
         }
 
@@ -139,7 +139,7 @@ class ProductController extends Controller
         // 4. Hantar respon JSON status berjaya (HTTP 200 OK secara default)
         return response()->json([
             'success' => true,
-            'message' => 'Produk berjaya dipadam'
+            'message' => 'Product deleted successfully'
         ]);
     }
 }
