@@ -20,8 +20,8 @@ class ProductController extends Controller
         if ($request->has('search') && !empty($request->search)) {
             $keyword = $request->search;
             $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('description', 'like', "%{$keyword}%");
+                $q->where('name', 'ilike', "%{$keyword}%")
+                  ->orWhere('description', 'ilike', "%{$keyword}%");
             });
         }
         // 3. Susunan (Sorting): Jika ada pilihan susun harga / nama / tarikh
